@@ -32,7 +32,7 @@ def build_dataset(cfg, is_train):
     heatmap_generator = [
         _HeatmapGenerator(
             output_size, cfg.DATASET.NUM_JOINTS, cfg.DATASET.SIGMA
-        ) for output_size in cfg.DATASET.OUTPUT_SIZE
+        ) for output_size in cfg.DATASET.OUTPUT_SIZE  # 如果是尺度感知, 需要去掉cfg.DATASET.SIGMA参数
     ]
     joints_generator = [
         JointsGenerator(
@@ -53,6 +53,24 @@ def build_dataset(cfg, is_train):
         joints_generator,
         transforms
     )
+
+    ################# 加速训练 ####################
+    training_data_size = 0.1
+    train_size = int(training_data_size * len(dataset))
+    test_size = len(dataset) - train_size
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+    dataset = train_dataset
+    ##############################################
+    ################# 加速训练2 ###################
+    import numpy as np
+    validation_split = 0.1
+    dataset_size = len(dataset)
+    indices = list(range(dataset_size))
+    split = int(np.floor(validation_split * dataset_size))
+    train_indices, val_indices = indices[split:], indices[:split]
+    valid_dataset = torch.utils.data.Subset(dataset, val_indices)
+    dataset = valid_dataset
+    ##############################################
 
     return dataset
 

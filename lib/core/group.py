@@ -174,6 +174,8 @@ class HeatmapParser(object):
 
         return ans
 
+    # 取最大值到次大值的四分之一处
+    # TODO 这里修改darkpose
     def adjust(self, ans, det):
         for batch_id, people in enumerate(ans):
             for people_id, i in enumerate(people):

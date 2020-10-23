@@ -25,7 +25,7 @@ class HeatmapGenerator():
         x0, y0 = 3*sigma + 1, 3*sigma + 1
         self.g = np.exp(- ((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma ** 2))
 
-    def __call__(self, joints):
+    def __call__(self, joints, img):
         hms = np.zeros((self.num_joints, self.output_res, self.output_res),
                        dtype=np.float32)
         sigma = self.sigma
@@ -53,6 +53,8 @@ class HeatmapGenerator():
             points: three pedestrians with annotation:[[163,53],[175,64],[189,74]].
             img_shape: (768,1024) 768 is row and 1024 is column.
             '''
+            sigma_matrix = []
+
             img_shape = [img.shape[0], img.shape[1]]
             print("Shape of current image: ", img_shape, ". Totally need generate ", len(points), "gaussian kernels.")
             density = np.zeros(img_shape, dtype=np.float32)
@@ -78,8 +80,9 @@ class HeatmapGenerator():
                 else:
                     sigma = np.average(np.array(gt.shape)) / 2. / 2.  # case: 1 point
                 density += scipy.ndimage.filters.gaussian_filter(pt2d, sigma, mode='constant')
+                sigma_matrix = sigma_matrix.append(sigma)
             print('done.')
-            return density
+            return density, sigma_matrix
 
         # # test code
         # if __name__ == "__main__":
@@ -122,16 +125,9 @@ class HeatmapGenerator():
             ####################################################################################
 
         for p in joints:
+            _, sigma_matrix = gaussian_filter_density(img, p)
 
             for idx, pt in enumerate(p):
-                ############人体内部尺度##############
-                if idx == 0:
-                    sigma = 2
-                elif idx == 1:
-                    sigma = 2
-                elif idx == 2:
-                    sigma = 2
-                #####################################
                 if pt[2] > 0:
                     x, y = int(pt[0]), int(pt[1])
                     if x < 0 or y < 0 or \

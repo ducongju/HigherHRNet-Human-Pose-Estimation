@@ -30,6 +30,43 @@ def conv3x3(in_planes, out_planes, stride=1):
                      padding=1, bias=False)
 
 
+############################  PRM  ###############################
+class conv_bn_relu(nn.Module):
+
+    def __init__(self, in_planes, out_planes, kernel_size, stride, padding,
+            has_bn=True, has_relu=True, efficient=False, groups=1):
+        super(conv_bn_relu, self).__init__()
+        self.conv = nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size,
+                stride=stride, padding=padding, groups=groups)
+        self.has_bn = has_bn
+        self.has_relu = has_relu
+        self.efficient = efficient
+        self.bn = nn.BatchNorm2d(out_planes)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        def _func_factory(conv, bn, relu, has_bn, has_relu):
+            def func(x):
+                x = conv(x)
+                if has_bn:
+                    x = bn(x)
+                if has_relu:
+                    x = relu(x)
+                return x
+            return func
+
+        func = _func_factory(
+                self.conv, self.bn, self.relu, self.has_bn, self.has_relu)
+
+        if self.efficient:
+            x = checkpoint(func, x)
+        else:
+            x = func(x)
+
+        return x
+############################  PRM  ####################################
+
+
 class BasicBlock(nn.Module):
     expansion = 1
 
@@ -308,6 +345,63 @@ class PoseHigherResolutionNet(nn.Module):
 
         self.pretrained_layers = cfg['MODEL']['EXTRA']['PRETRAINED_LAYERS']
 
+        ###########################  PRM  #################################
+        self.output_chl_num = 64
+        self.conv_bn_relu_prm_1 = conv_bn_relu(self.output_chl_num, self.output_chl_num, kernel_size=3,
+                stride=1, padding=1, has_bn=True, has_relu=True,
+                efficient=False)
+        self.conv_bn_relu_prm_2_1 = conv_bn_relu(self.output_chl_num, self.output_chl_num, kernel_size=1,
+                stride=1, padding=0, has_bn=True, has_relu=True,
+                efficient=False)
+        self.conv_bn_relu_prm_2_2 = conv_bn_relu(self.output_chl_num, self.output_chl_num, kernel_size=1,
+                stride=1, padding=0, has_bn=True, has_relu=True,
+                efficient=False)
+        self.sigmoid2 = nn.Sigmoid()
+        self.conv_bn_relu_prm_3_1 = conv_bn_relu(self.output_chl_num, self.output_chl_num, kernel_size=1,
+                stride=1, padding=0, has_bn=True, has_relu=True,
+                efficient=False)
+        self.conv_bn_relu_prm_3_2 = conv_bn_relu(self.output_chl_num, self.output_chl_num, kernel_size=9,
+                stride=1, padding=4, has_bn=True, has_relu=True,
+                efficient=False, groups=self.output_chl_num)
+        self.sigmoid3 = nn.Sigmoid()
+
+        self.output_chl_num = 128
+        self.conv_bn_relu_prm_11 = conv_bn_relu(self.output_chl_num, self.output_chl_num, kernel_size=3,
+                stride=1, padding=1, has_bn=True, has_relu=True,
+                efficient=False)
+        self.conv_bn_relu_prm_2_11 = conv_bn_relu(self.output_chl_num, self.output_chl_num, kernel_size=1,
+                stride=1, padding=0, has_bn=True, has_relu=True,
+                efficient=False)
+        self.conv_bn_relu_prm_2_21 = conv_bn_relu(self.output_chl_num, self.output_chl_num, kernel_size=1,
+                stride=1, padding=0, has_bn=True, has_relu=True,
+                efficient=False)
+        self.sigmoid2 = nn.Sigmoid()
+        self.conv_bn_relu_prm_3_11 = conv_bn_relu(self.output_chl_num, self.output_chl_num, kernel_size=1,
+                stride=1, padding=0, has_bn=True, has_relu=True,
+                efficient=False)
+        self.conv_bn_relu_prm_3_21 = conv_bn_relu(self.output_chl_num, self.output_chl_num, kernel_size=9,
+                stride=1, padding=4, has_bn=True, has_relu=True,
+                efficient=False, groups=self.output_chl_num)
+
+        self.output_chl_num = 17
+        self.conv_bn_relu_prm_12 = conv_bn_relu(self.output_chl_num, self.output_chl_num, kernel_size=3,
+                stride=1, padding=1, has_bn=True, has_relu=True,
+                efficient=False)
+        self.conv_bn_relu_prm_2_12 = conv_bn_relu(self.output_chl_num, self.output_chl_num, kernel_size=1,
+                stride=1, padding=0, has_bn=True, has_relu=True,
+                efficient=False)
+        self.conv_bn_relu_prm_2_22 = conv_bn_relu(self.output_chl_num, self.output_chl_num, kernel_size=1,
+                stride=1, padding=0, has_bn=True, has_relu=True,
+                efficient=False)
+        self.sigmoid2 = nn.Sigmoid()
+        self.conv_bn_relu_prm_3_12 = conv_bn_relu(self.output_chl_num, self.output_chl_num, kernel_size=1,
+                stride=1, padding=0, has_bn=True, has_relu=True,
+                efficient=False)
+        self.conv_bn_relu_prm_3_22 = conv_bn_relu(self.output_chl_num, self.output_chl_num, kernel_size=9,
+                stride=1, padding=4, has_bn=True, has_relu=True,
+                efficient=False, groups=self.output_chl_num)
+        ###########################  PRM  #################################
+
     def _make_final_layers(self, cfg, input_channels):
         dim_tag = cfg.MODEL.NUM_JOINTS if cfg.MODEL.TAG_PER_JOINT else 1
         extra = cfg.MODEL.EXTRA
@@ -477,8 +571,8 @@ class PoseHigherResolutionNet(nn.Module):
         x = self.relu(x)
         x = self.conv2(x)
         x = self.bn2(x)
-        x = self.relu(x)
-        x = self.layer1(x)
+        x = self.relu(x)  # 经过stem
+        x = self.layer1(x)  # 经过特征提取
 
         x_list = []
         for i in range(self.stage2_cfg['NUM_BRANCHES']):
@@ -488,6 +582,19 @@ class PoseHigherResolutionNet(nn.Module):
                 x_list.append(x)
         y_list = self.stage2(x_list)
 
+        ##################### stage2的PRM2 ########################
+        out = self.conv_bn_relu_prm_1(y_list[-1])
+        out_1 = out
+        out_2 = torch.nn.functional.adaptive_avg_pool2d(out_1, (1, 1))
+        out_2 = self.conv_bn_relu_prm_2_1(out_2)
+        out_2 = self.conv_bn_relu_prm_2_2(out_2)
+        out_2 = self.sigmoid2(out_2)
+        out_3 = self.conv_bn_relu_prm_3_1(out_1)
+        out_3 = self.conv_bn_relu_prm_3_2(out_3)
+        out_3 = self.sigmoid3(out_3)
+        y_list[-1] = out_1.mul(1 + out_2.mul(out_3))
+        ############################################################
+
         x_list = []
         for i in range(self.stage3_cfg['NUM_BRANCHES']):
             if self.transition2[i] is not None:
@@ -495,6 +602,19 @@ class PoseHigherResolutionNet(nn.Module):
             else:
                 x_list.append(y_list[i])
         y_list = self.stage3(x_list)
+
+        ##################### stage3的PRM3 ########################
+        out = self.conv_bn_relu_prm_11(y_list[-1])
+        out_1 = out
+        out_2 = torch.nn.functional.adaptive_avg_pool2d(out_1, (1, 1))
+        out_2 = self.conv_bn_relu_prm_2_11(out_2)
+        out_2 = self.conv_bn_relu_prm_2_21(out_2)
+        out_2 = self.sigmoid2(out_2)
+        out_3 = self.conv_bn_relu_prm_3_11(out_1)
+        out_3 = self.conv_bn_relu_prm_3_21(out_3)
+        out_3 = self.sigmoid3(out_3)
+        y_list[-1] = out_1.mul(1 + out_2.mul(out_3))
+        ############################################################
 
         x_list = []
         for i in range(self.stage4_cfg['NUM_BRANCHES']):
@@ -515,6 +635,20 @@ class PoseHigherResolutionNet(nn.Module):
 
             x = self.deconv_layers[i](x)
             y = self.final_layers[i+1](x)
+
+            #################  PRM  #####################
+            out = self.conv_bn_relu_prm_12(y)
+            out_1 = out
+            out_2 = torch.nn.functional.adaptive_avg_pool2d(out_1, (1, 1))
+            out_2 = self.conv_bn_relu_prm_2_12(out_2)
+            out_2 = self.conv_bn_relu_prm_2_22(out_2)
+            out_2 = self.sigmoid2(out_2)
+            out_3 = self.conv_bn_relu_prm_3_12(out_1)
+            out_3 = self.conv_bn_relu_prm_3_22(out_3)
+            out_3 = self.sigmoid3(out_3)
+            y = out_1.mul(1 + out_2.mul(out_3))
+            #############################################
+
             final_outputs.append(y)
 
         return final_outputs

@@ -96,28 +96,57 @@ class CocoKeypoints(CocoDataset):
         num_people = len(anno)
 
         if self.scale_aware_sigma:
-            joints = np.zeros((num_people, self.num_joints, 4))
+            joints = np.zeros((num_people, self.num_joints, 4))  # 对于每个人体的每个关节赋予不同的sigma值
         else:
             joints = np.zeros((num_people, self.num_joints, 3))
 
         for i, obj in enumerate(anno):
             joints[i, :self.num_joints_without_center, :3] = \
-                np.array(obj['keypoints']).reshape([-1, 3])
+                np.array(obj['keypoints']).reshape([-1, 3])  # 将一维列表转换为二维列表
+            # HigherHRNet没有用上centermap
             if self.with_center:
                 joints_sum = np.sum(joints[i, :-1, :2], axis=0)
                 num_vis_joints = len(np.nonzero(joints[i, :-1, 2])[0])
                 if num_vis_joints > 0:
                     joints[i, -1, :2] = joints_sum / num_vis_joints
                     joints[i, -1, 2] = 1
+            # 设置人体之间的尺度感知sigma参数, 而人体内部没有尺度感知
+            # if self.scale_aware_sigma:
+            #     # get person box
+            #     box = obj['bbox']
+            #     size = max(box[2], box[3])  # sigma大小以人体包围框的长边作为参考, 256时为2
+            #     sigma = size / self.base_size * self.base_sigma  # base_size = 256, base_sigma = 2.0
+            #     if self.int_sigma:
+            #         sigma = int(np.round(sigma + 0.5))  # 对sigma取整
+            #     assert sigma > 0, sigma
+            #     joints[i, :, 3] = sigma  # 为某一个人的不同关节设置相同的值
+            ###########################  人体外部尺度  ################################
             if self.scale_aware_sigma:
-                # get person box
+            # 人体外部尺度
                 box = obj['bbox']
-                size = max(box[2], box[3])
-                sigma = size / self.base_size * self.base_sigma
-                if self.int_sigma:
-                    sigma = int(np.round(sigma + 0.5))
-                assert sigma > 0, sigma
-                joints[i, :, 3] = sigma
+                intersize = max(box[2], box[3])
+                base_intersize = 128
+                base_intersigma = 2
+                # 线性变化
+                intersigma = intersize / base_intersize * base_intersigma
+                # 非线性变化
+                x = intersize / base_intersize
+                intersigma = (np.exp(x) - np.exp(-x)) / (np.exp(x) + np.exp(-x)) * base_intersigma
+
+            # 人体内部尺度
+                # 非截断设置
+                intrasize = np.array([.026, .025, .025, .035, .035, .079, .079, .072, .072,
+                             .062, .062, .107, .107, .087, .087, .089, .089])
+                # 截断设置
+                intrasize = np.array([.062, .062, .062, .062, .062, .079, .079, .072, .072,
+                             .062, .062, .107, .107, .087, .087, .089, .089])
+                base_intrasize = 0.062
+                base_intrasigma = 2
+                intrasigma = intrasize / base_intrasize * base_intrasigma
+
+            # 人体综合尺度
+                joints[i, :, 3] = intersigma * intrasigma
+            ###########################  人体内部尺度  ################################
 
         return joints
 

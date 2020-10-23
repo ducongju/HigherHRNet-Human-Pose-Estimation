@@ -86,7 +86,10 @@ _C.DATASET.FLIP = 0.5
 
 # heatmap generator (default is OUTPUT_SIZE/64)
 _C.DATASET.SIGMA = -1
-_C.DATASET.SCALE_AWARE_SIGMA = False
+# _C.DATASET.SCALE_AWARE_SIGMA = False
+#####################################
+_C.DATASET.SCALE_AWARE_SIGMA = True
+#####################################
 _C.DATASET.BASE_SIZE = 256.0
 _C.DATASET.BASE_SIGMA = 2.0
 _C.DATASET.INT_SIGMA = False
@@ -141,7 +144,10 @@ _C.TEST.PROJECT2IMAGE = False
 _C.TEST.WITH_HEATMAPS = (True,)
 _C.TEST.WITH_AE = (True,)
 
-_C.TEST.LOG_PROGRESS = False
+# _C.TEST.LOG_PROGRESS = False
+#####################################
+_C.TEST.LOG_PROGRESS = True
+#####################################
 
 # debug
 _C.DEBUG = CN()

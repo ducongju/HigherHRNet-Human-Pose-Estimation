@@ -32,9 +32,9 @@ class HeatmapLoss(nn.Module):
 
     def forward(self, pred, gt, mask):
         assert pred.size() == gt.size()
-        loss = ((pred - gt)**2) * mask[:, None, :, :].expand_as(pred)
-        loss = loss.mean(dim=3).mean(dim=2).mean(dim=1)
-        # loss = loss.mean(dim=3).mean(dim=2).sum(dim=1)
+        loss = ((pred - gt)**2) * mask[:, None, :, :].expand_as(pred)  # 只计算输入图片与变换图片重叠的部分
+        loss = loss.mean(dim=3).mean(dim=2).mean(dim=1)  # mask为1表示该像素来自于原图而不是0
+        # loss = loss.mean(dim=3).mean(dim=2).sum(dim=1)  # dim: N C H W
         return loss
 
 
@@ -103,6 +103,7 @@ class AELoss(nn.Module):
         return torch.stack(pushes), torch.stack(pulls)
 
 
+# 接口都不对
 class JointsMSELoss(nn.Module):
     def __init__(self, use_target_weight):
         super(JointsMSELoss, self).__init__()
